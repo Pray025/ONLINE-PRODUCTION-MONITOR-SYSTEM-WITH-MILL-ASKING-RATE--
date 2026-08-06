@@ -159,8 +159,12 @@ Other pages:
 
 No license file is currently included in this project. Add one (e.g. MIT, Apache 2.0) if you intend to distribute or open-source this code.
 
+
 👤 Author
 Pratham Ray
+
 Internship: TATA Steel
+
 GitHub: @Pray025
+
 LinkedIn: https://www.linkedin.com/in/pratham-ray
