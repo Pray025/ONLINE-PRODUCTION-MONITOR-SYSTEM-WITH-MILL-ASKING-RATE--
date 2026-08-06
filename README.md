@@ -1,105 +1,166 @@
-# 🏭 Real-Time Production Monitoring System
+# 🏭 Production Monitoring System
 
-[![TATA Steel Internship](https://img.shields.io/badge/Project-TATA%20Steel%20Internship-blue.svg)](https://www.tatasteel.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.x-green.svg)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/Framework-Flask-black.svg)](https://flask.palletsprojects.com/)
+A Spring Boot web application for monitoring Hot Strip Mill (HSM) coil production in real time, tracking hourly production rates against required targets, and generating daily/monthly performance reports (with Excel and PDF export) for Tata Steel.
 
-> An end-to-end industrial production monitoring and data logging solution developed during my internship at **TATA Steel**. The system continuously tracks shop-floor operations, captures machine telemetry in real-time, logs throughput data, and provides operational visibility to optimize productivity and minimize unplanned downtime.
+## 📋 Overview
 
----
+The system periodically imports coil production data from an Excel source file, stores it in an Oracle database, and exposes it through a REST API consumed by a set of dashboard pages. It gives production staff a live view of how actual output compares to target output, historical hour-by-hour records, visual analytics, and monthly summary reports.
 
-## 📌 Project Overview
+## ✨ Features
 
-In steel manufacturing, maintaining continuous visibility over production throughput, delay events, and machine efficiency is critical. This project digitizes and automates operational data collection from shop-floor units, shifting from manual logbooks to a centralized, automated monitoring system.
+- 📊 **Live Dashboard** — hourly table showing date, hour range, required vs. actual production rate, number of coils rolled, and actual coil weight, refreshed automatically against a configurable daily target (default: 12,500 tons).
+- 📈 **Production Analytics** — interactive chart (Chart.js, with zoom/pan support) comparing required vs. actual production rate for a selected date.
+- 🕘 **History Reports** — browse past hourly production records by date.
+- 🗓️ **Monthly Report** — daily target/actual/balance, coil count, and average coil weight for a selected month against a configurable monthly target (default: 360,000 tons), with a summary chart and one-click **Export to Excel** and **Export to PDF**.
+- 🔄 **Automatic Excel Import** — a scheduled background job reads a coil birth/production Excel workbook and syncs new coil records into the database (`COIL_PRODUCTION` and `COIL_PDI` sheets).
+- 🌗 **Light / Dark Mode** — theme toggle on the dashboard.
+- 📱 **Collapsible Sidebar Navigation** — shared across all pages (Live Dashboard, Analytics, History, Monthly Report).
 
-### Key Objectives
-- **Automated Data Capture:** Periodically poll and store shop-floor telemetry and production counts.
-- **Downtime & Delay Tracking:** Log delay durations and operational bottlenecks for root-cause analysis.
-- **Analytics & Reporting:** Store structured production data in Excel/database formats for downstream analysis and reporting.
-- **Scalable Architecture:** Lightweight backend built with Flask and Python, easily adaptable to various industrial protocols (PLCs/SCADA/IoT edge nodes).
+## 🛠️ Tech Stack
 
----
+| Layer | Technology |
+|---|---|
+| Backend | Java 21, Spring Boot 3.5.15 (Spring Web, Spring Data JPA) |
+| Database | Oracle Database (via `ojdbc11`, Hibernate `OracleDialect`) |
+| Excel I/O | Apache POI (`poi-ooxml` 5.2.5) |
+| PDF Export | iText (`itextpdf` 5.5.13.3) |
+| Boilerplate | Lombok |
+| Frontend | Plain HTML / CSS / JavaScript, Chart.js + chartjs-plugin-zoom |
+| Build Tool | Maven (with Maven Wrapper) |
 
-## 📂 Repository Structure
+## 📁 Project Structure
 
-```text
-Production-Monitoring-System/
-├── app.py                   # Main Flask web server & API endpoints
-├── data_logger.py           # Production & telemetry logging module
-├── templates/               # HTML templates for operational dashboard
-│   ├── index.html           # Main dashboard interface
-│   └── report.html          # Production report view
-├── static/                  # CSS stylesheets, JS scripts, and images
-│   ├── css/
-│   └── js/
-├── data/                    # Local storage for logged Excel/CSV records
-├── requirements.txt         # Python dependency list
-├── .gitignore               # Ignored files (temporary logs, .xlsx, virtualenvs)
-└── README.md                # Project documentation
+```
+production-monitoring-system/
+├── src/main/java/com/tatasteel/production/
+│   ├── ProductionMonitoringSystemApplication.java   # Entry point (@EnableScheduling)
+│   ├── controller/
+│   │   ├── ProductionController.java                # /api/production/live
+│   │   ├── HourlyAskingRateReportController.java     # /api/live-production
+│   │   ├── MonthlyReportController.java              # /api/reports/monthly, /api/reports/save
+│   │   └── MonthlyExportController.java              # /api/reports/monthly/excel, /pdf
+│   ├── service/
+│   │   ├── ExcelImportService.java                   # Scheduled Excel -> DB sync
+│   │   ├── HourlyAskingRateReportService.java
+│   │   ├── MonthlyReportService.java                 # Builds monthly report + saves to DB
+│   │   └── MonthlyExportService.java                 # Generates Excel/PDF exports
+│   ├── repository/                                   # Spring Data JPA repositories
+│   ├── entity/                                        # CoilPdi, CoilProduction, HourlyAskingRateReport
+│   └── dto/
+│       └── MonthlyReportDTO.java
+├── src/main/resources/
+│   ├── application.properties
+│   └── static/
+│       ├── html/   (index, analytics, history, monthly-report)
+│       ├── css/style.css
+│       └── js/     (app.js, menu.js, monthly-report.js)
+├── excel-data/
+│   └── Coil_Birth_Information (2).xlsx                # Source workbook for the import job
+├── HSM_Table.sql                                       # Database schema / table setup
+└── pom.xml
+```
 
-🛠️ Tech Stack
-Backend: Python 3, Flask
+## 🔌 API Endpoints
 
-Data Handling: pandas, openpyxl (Excel automation & logging)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/production/live` | Live coil production data (from `CoilPdi`), ordered by birth time |
+| `GET` | `/api/live-production` | Hourly asking-rate report data, ordered by start time |
+| `GET` | `/api/reports/monthly?month=&target=` | Monthly report rows for a given month, evaluated against a target (default target: 360000) |
+| `POST` | `/api/reports/save` | Persist a list of monthly report rows |
+| `GET` | `/api/reports/monthly/excel?month=&target=` | Download the monthly report as an `.xlsx` file |
+| `GET` | `/api/reports/monthly/pdf?month=&target=` | Download the monthly report as a `.pdf` file |
 
-Frontend: HTML5, CSS3, JavaScript (Fetch API / Chart.js for real-time visualization)
+All controllers are annotated `@CrossOrigin`, so the API can be called from a frontend served on a different origin.
 
-Database/Storage: File-based data logging (.xlsx / SQLite)
+## ✅ Prerequisites
 
-Environment: VS Code, Git
+- Java 21 (JDK)
+- Maven (or use the included `mvnw` / `mvnw.cmd` wrapper)
+- Oracle Database (a reachable instance, e.g. Oracle XE with pluggable database `XEPDB1`)
+- The `HSM_Table.sql` script run against your schema to create the required tables
 
-🚀 Getting Started
-Follow these steps to run the Production Monitoring System locally.
+## ⚙️ Configuration
 
-Prerequisites
-Python 3.8 or higher installed on your machine.
+Database connection and server settings live in `src/main/resources/application.properties`:
 
-Git installed.
+```properties
+spring.application.name=production-monitoring-system
 
-1. Clone the Repository
-git clone [https://github.com/YOUR-USERNAME/YOUR-REPOSITORY-NAME.git](https://github.com/YOUR-USERNAME/YOUR-REPOSITORY-NAME.git)
-cd YOUR-REPOSITORY-NAME
+# Oracle Database Connection
+spring.datasource.url=jdbc:oracle:thin:@localhost:1521/XEPDB1
+spring.datasource.username=system
+spring.datasource.password=oracle
+spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
 
-2. Create a Virtual Environment (Recommended)
-# On Windows
-python -m venv venv
-venv\Scripts\activate
+# JPA Configuration
+spring.jpa.hibernate.ddl-auto=none
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.database-platform=org.hibernate.dialect.OracleDialect
 
-# On macOS/Linux
-python3 -m venv venv
-source venv/bin/activate
+# Server Port
+server.port=8080
+```
 
-3. Install Dependencies
-pip install -r requirements.txt
+> ⚠️ **Note:** `spring.jpa.hibernate.ddl-auto=none` means Hibernate will not create or update the schema. Run `HSM_Table.sql` yourself before starting the app, and update the datasource credentials for your environment before deploying.
 
-4. Run the Application
-python app.py
+The scheduled Excel import (`ExcelImportService`) currently reads from a hardcoded local path:
 
-5. Access the Dashboard
-Open your web browser and navigate to:
-[http://127.0.0.1:5000/](http://127.0.0.1:5000/)
+```
+C:\Projects\production-monitoring-system\excel-data\Coil_Birth_Information (2).xlsx
+```
 
-⚙️ Features
-⏱️ Live Status Monitoring: Monitor real-time status of connected machinery/production lines.
+Update this path (ideally by externalizing it into `application.properties`) to match your environment before running the import job.
 
-📊 Shift-wise Production Logging: Record hourly and shift-wise item counts automatically.
+## 🚀 Running the Application
 
-🛑 Delay & Breakdown Management: Log downtime events with timestamps for OEE (Overall Equipment Effectiveness) tracking.
+Using the Maven wrapper:
 
-📁 Excel Export: Export generated logs directly into formatted .xlsx files for official TATA Steel shift reporting.
+```bash
+# Windows
+mvnw.cmd spring-boot:run
 
-🔒 Confidentiality & Security Note
-Note: Any proprietary machine addresses, internal IP configurations, sensitive plant metrics, or credentials related to TATA Steel have been sanitized or omitted from this public repository in compliance with NDA and internal data protection policies.
+# macOS / Linux
+./mvnw spring-boot:run
+```
 
-📜 License
-Distributed under the MIT License. See LICENSE for more information.
+Or build a jar and run it directly:
+
+```bash
+./mvnw clean package
+java -jar target/production-monitoring-system-0.0.1-SNAPSHOT.jar
+```
+
+The application starts on **http://localhost:8080** by default. Open the dashboard at:
+
+```
+http://localhost:8080/html/index.html
+```
+
+Other pages:
+- `http://localhost:8080/html/analytics.html`
+- `http://localhost:8080/html/history.html`
+- `http://localhost:8080/html/monthly-report.html`
+
+## 🧪 Running Tests
+
+```bash
+./mvnw test
+```
+
+## 📝 Notes
+
+- The Excel import job runs on a fixed delay (`@Scheduled(fixedDelay = ...)`) once the application starts, so make sure the source workbook is available at startup.
+- The monthly report's daily target and the dashboard's daily target are both adjustable directly in the UI (`monthlyTargetInput` and the target display on the live dashboard).
+- Exported Excel/PDF filenames are `Monthly_Report.xlsx` and `Monthly_Report.pdf`.
+
+## 📄 License
+
+No license file is currently included in this project. Add one (e.g. MIT, Apache 2.0) if you intend to distribute or open-source this code.
 
 👤 Author
 Pratham Ray
-
 Internship: TATA Steel
-
 GitHub: @Pray025
-
 LinkedIn: https://www.linkedin.com/in/pratham-ray
